@@ -7,6 +7,7 @@ import com.franklouw.b1248.render.BadgeRenderer;
 import com.franklouw.b1248.render.Bitmap;
 
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
@@ -20,12 +21,17 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
 import javax.imageio.ImageIO;
 import java.io.File;
 import java.io.IOException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Main JavaFX application: edit up to 8 messages (text/image + effect) and write
@@ -49,7 +55,15 @@ public class BadgeApp extends Application {
     private final Spinner<Integer> speedSpinner = new Spinner<>(1, 8, 4);
     private final CheckBox blinkBox = new CheckBox("Blink");
     private final CheckBox frameBox = new CheckBox("Frame");
-    private final Label statusLabel = new Label("Device not connected");
+    private final Circle deviceStatusDot = new Circle(6);
+    private final Label deviceStatusLabel = new Label("Checking...");
+    private final Label statusLabel = new Label("Ready");
+
+    private final ScheduledExecutorService poller = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "device-poll");
+        t.setDaemon(true);
+        return t;
+    });
     private final Label overflowLabel = new Label();
 
     private int selectedSlot;
@@ -71,7 +85,7 @@ public class BadgeApp extends Application {
         writeButton.setOnAction(e -> write());
         Button clearButton = new Button("Clear all");
         clearButton.setOnAction(e -> clearAll());
-        HBox topBar = new HBox(8, writeButton, clearButton, statusLabel);
+        HBox topBar = new HBox(8, writeButton, clearButton, deviceStatusDot, deviceStatusLabel, statusLabel);
         topBar.setPadding(new Insets(8));
 
         for (int i = 0; i < SLOT_COUNT; i++) {
@@ -115,8 +129,21 @@ public class BadgeApp extends Application {
         Scene scene = new Scene(root, 900, 420);
         stage.setTitle("B1248 Name Badge Programmer");
         stage.setScene(scene);
-        stage.setOnCloseRequest(e -> writer.shutdown());
+        stage.setOnCloseRequest(e -> {
+            poller.shutdownNow();
+            writer.shutdown();
+        });
         stage.show();
+
+        poller.scheduleWithFixedDelay(this::refreshDeviceStatus, 0, 2, TimeUnit.SECONDS);
+    }
+
+    private void refreshDeviceStatus() {
+        boolean present = writer.isDevicePresent();
+        Platform.runLater(() -> {
+            deviceStatusDot.setFill(present ? Color.LIME : Color.RED);
+            deviceStatusLabel.setText(present ? "Connected" : "Not connected");
+        });
     }
 
     private void wireListeners() {

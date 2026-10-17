@@ -54,6 +54,11 @@ public class BadgeWriter {
         return device != null;
     }
 
+    /** Whether a B1248 badge is currently attached (not necessarily open). */
+    public boolean isDevicePresent() {
+        return services.getHidDevice(VID, PID, null) != null;
+    }
+
     /** Close the device handle (keeps the HID services running so it can be reopened). */
     public void close() {
         if (device != null) {
