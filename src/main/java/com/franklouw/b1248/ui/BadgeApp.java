@@ -15,6 +15,7 @@ import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
+import javafx.scene.control.ProgressBar;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.BorderPane;
@@ -58,6 +59,8 @@ public class BadgeApp extends Application {
     private final Circle deviceStatusDot = new Circle(6);
     private final Label deviceStatusLabel = new Label("Checking...");
     private final Label statusLabel = new Label("Ready");
+    private final ProgressBar usageBar = new ProgressBar(0);
+    private final Label usageLabel = new Label();
 
     private final ScheduledExecutorService poller = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "device-poll");
@@ -85,7 +88,10 @@ public class BadgeApp extends Application {
         writeButton.setOnAction(e -> write());
         Button clearButton = new Button("Clear all");
         clearButton.setOnAction(e -> clearAll());
-        HBox topBar = new HBox(8, writeButton, clearButton, deviceStatusDot, deviceStatusLabel, statusLabel);
+        usageBar.setPrefWidth(140);
+        usageBar.setMaxWidth(140);
+        HBox topBar = new HBox(8, writeButton, clearButton, deviceStatusDot, deviceStatusLabel,
+                usageBar, usageLabel, statusLabel);
         topBar.setPadding(new Insets(8));
 
         for (int i = 0; i < SLOT_COUNT; i++) {
@@ -206,6 +212,28 @@ public class BadgeApp extends Application {
             overflowLabel.setText("Message is " + b.widthPx() + " px wide and will " + behavior + ".");
         } else {
             overflowLabel.setText("");
+        }
+        refreshUsage();
+    }
+
+    private void refreshUsage() {
+        int used = 0;
+        for (MessageDraft d : drafts) {
+            if (!d.hasContent()) {
+                continue;
+            }
+            Bitmap b = d.image != null ? renderer.renderImage(d.image) : renderer.renderText(d.text);
+            used += b.cols();
+        }
+        int max = BadgeWriter.MAX_TOTAL_COLUMNS;
+        usageBar.setProgress(Math.min(1.0, (double) used / max));
+        usageLabel.setText(used + " / " + max + " columns (" + (used * 8) + " / " + (max * 8) + " px)");
+        if (used > max) {
+            usageLabel.setTextFill(Color.RED);
+            usageBar.setStyle("-fx-accent: red;");
+        } else {
+            usageLabel.setTextFill(Color.BLACK);
+            usageBar.setStyle("");
         }
     }
 
