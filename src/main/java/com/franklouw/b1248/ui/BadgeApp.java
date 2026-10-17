@@ -16,6 +16,7 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.control.ProgressBar;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.BorderPane;
@@ -117,11 +118,17 @@ public class BadgeApp extends Application {
                 new Label("Speed"), speedSpinner,
                 blinkBox, frameBox);
 
+        ScrollPane previewScroll = new ScrollPane(preview);
+        previewScroll.setPrefViewportWidth(360);
+        previewScroll.setPrefViewportHeight(104);
+        previewScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        previewScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+
         VBox editor = new VBox(8,
                 new Label("Text (or load an image):"),
                 textRow,
                 controls,
-                preview,
+                previewScroll,
                 overflowLabel);
         editor.setPadding(new Insets(8));
 

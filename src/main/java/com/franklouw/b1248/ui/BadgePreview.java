@@ -15,7 +15,6 @@ public final class BadgePreview extends Canvas {
     private static final int SCALE = 8;
     private static final int HEIGHT = BadgeWriter.HEIGHT;
     private static final int DISPLAY_WIDTH = 44;
-    private static final int MAX_PREVIEW_WIDTH = BadgeWriter.MAX_TOTAL_COLUMNS * 8;
 
     private Bitmap bitmap;
 
@@ -26,9 +25,7 @@ public final class BadgePreview extends Canvas {
 
     public void setBitmap(Bitmap bitmap) {
         this.bitmap = bitmap;
-        int width = bitmap == null
-                ? DISPLAY_WIDTH
-                : Math.max(DISPLAY_WIDTH, Math.min(bitmap.widthPx(), MAX_PREVIEW_WIDTH));
+        int width = bitmap == null ? DISPLAY_WIDTH : Math.max(DISPLAY_WIDTH, bitmap.widthPx());
         setWidth(width * SCALE);
         setHeight(HEIGHT * SCALE);
         redraw();
