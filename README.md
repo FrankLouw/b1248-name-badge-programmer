@@ -13,6 +13,22 @@ validated device protocol, application requirements, and build/packaging plan.
 - Maven
 - [hid4java](https://github.com/gary-rowe/hid4java) (bundles hidapi for Windows/Linux/macOS)
 
+## Usage
+
+```
+mvn javafx:run
+```
+
+Select a slot, enter text (or load an image), set the effect/speed/blink/frame,
+watch the live preview, then click **Write to badge** with the device connected.
+
 ## Status
 
-Planning/specification complete. Development not started.
+Functional MVP. Note the device's write buffer caps total content at **23 byte-columns
+(184 px)** — about 3 full-width messages — see [SPEC.md §9](SPEC.md).
+
+## License
+
+- Code: [MIT](LICENSE)
+- Bundled [DejaVu Sans](https://dejavu-fonts.github.io/) font: Bitstream Vera License
+  (see `src/main/resources/fonts/DejaVuSans-LICENSE.txt`)
