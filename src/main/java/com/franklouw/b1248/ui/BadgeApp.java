@@ -246,8 +246,4 @@ public class BadgeApp extends Application {
         }
         return badge;
     }
-
-    public static void main(String[] args) {
-        launch(args);
-    }
 }
