@@ -34,7 +34,7 @@ import java.io.IOException;
 public class BadgeApp extends Application {
 
     private static final String[] EFFECT_NAMES =
-            {"left", "right", "up", "down", "freeze", "animation", "snow", "volume"};
+            {"left", "right", "up", "down", "freeze", "animation (frame-strip image)", "snow", "volume"};
     private static final int SLOT_COUNT = 8;
     private static final int DISPLAY_WIDTH = 44;
 
