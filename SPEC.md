@@ -93,6 +93,12 @@ Effect ids:
 | 7 | volume |
 
 - Speed is stored as `speed - 1`, so user-facing speed is `1..8`.
+- All effect ids 0–7 have been **validated on the device** (left/right/up/down scroll, freeze,
+  animation, snow, volume).
+- **Animation (5)** expects the message data as `N` frames, each 6 byte-columns (48 px) wide:
+  the message is a single wide bitmap `N × 6` byte-columns, and the badge cycles through the
+  frames. (3 frames validated.)
+- **Snow (6)** and **volume (7)** are built-in effects and do not require special data.
 - A "laser" effect (id 8) exists in some references but is truncated by the 3-bit field; treat it as unsupported.
 - Brightness is **not** part of the B1248 header and is not supported by this device.
 
@@ -107,8 +113,13 @@ bit means "lit".
 **Transmission** (row-major): the 11 data reports carry one horizontal row each. For row
 `j` (0..10), the report contains row `j` of every message, concatenated in slot order,
 each message's bytes placed at the byte offset given by its cumulative `offset` in the
-header. If the total width across all messages exceeds 64 byte-columns, the row is
-segmented across multiple reports (not yet validated — see §9).
+header. The badge reads exactly `W` bytes from each of the 11 data reports (where `W` is
+the summed width), then ignores the dummy report.
+
+**Hard capacity limit:** the device's write buffer is **256 bytes**, i.e. `11 × W ≤ 256`.
+This caps total content at **23 byte-columns (184 px)** — see §9 for the full investigation
+and the consequence that the device cannot actually hold 8 full-width messages via this
+protocol.
 
 ### 3.5 Opening the device
 
@@ -120,12 +131,16 @@ segmented across multiple reports (not yet validated — see §9).
 
 ### 4.1 Functional
 
-- Create up to **8 messages**; each message is text and/or an image.
+- Create up to **8 messages**; each message is text and/or an image. **MVP limit: total
+  content ≤ 23 byte-columns (184 px)** — i.e. up to 3 full-width (44 px) messages, or more
+  shorter ones (see §9).
 - Per message: choose **effect**, **speed** (1..8), **blink** on/off, **frame** (border) on/off.
 - **Live preview** of each message as an 11×44 pixel grid (scaled up), so the user sees exactly what will be sent.
 - **Write** the current configuration to the device.
 - **Clear** the device (write a header with all slots disabled).
 - **Auto-detect** the device and report a clear error if it is not found.
+- **Enforce/warn on the width cap**: warn (or block) when the summed message width would
+  exceed 23 byte-columns, since the device drops or corrupts the overflow.
 
 ### 4.2 Cross-platform
 
@@ -185,19 +200,47 @@ Four layers, each independently testable:
 
 ## 9. Known Issues & Open Questions
 
-1. **Four-slot drop (unresolved):** a 4-message write rendered the 4th slot (offset 18)
-   as all-dark while 1- and 2-message writes rendered correctly. Header and data were
-   byte-verified correct, so the cause is likely a device-firmware detail (or an
-   interaction with the total 24-column width). Must be reproduced and root-caused
-   before shipping 8-message support.
-2. **Segmentation > 64 byte-columns:** sending a row wider than 64 columns requires
-   splitting across reports; not yet validated. The MVP may limit total content width.
+1. **256-byte write-buffer limit (device-side, confirmed).** The device's single write is
+   capped at 256 bytes of image data, i.e. `11 rows × total byte-columns ≤ 256`, which
+   means **total content ≤ 23 byte-columns (184 px)**. Empirically (all byte-identical
+   across an independent Python harness and the Java implementation):
+   - totals of 12, 16, 20, 21, 22, 23 columns render correctly;
+   - 24 columns (4 × 44 px) drops the last message ("M4 blank", M1–M3 correct);
+   - 25+ columns renders unpredictably (blank / all-solid / transient garble).
+   
+   The failure mode — the last message(s) being dropped — is consistent with a 256-byte
+   buffer that fills in message order (3 full messages = 198 bytes fit; a 4th pushes it
+   over). This is a **firmware/device behavior, not a code bug**.
+   
+   **Ruled out by experiment** (none unlock > 23 columns):
+   - per-message data blocks (only the first message renders);
+   - byte-stream transmission, row-major and column-major (misaligned — the badge reads
+     `W` bytes per report, not 64);
+   - timing (longer delays / a 0.5 s pause at the 256-byte boundary);
+   - a page/address field in the unused header bytes (42–63) or the "Hello" padding.
+   
+   **Sibling badge differs:** the LS32 (`0416:5020`, "wang" protocol) stores messages with
+   2-byte big-endian lengths and column-major "stuffed" data, confirming the B1248's
+   protocol is distinct and that its multi-message (> 256-byte) capability is *not*
+   documented in any public reference. Each write (`Hello → header → data`) **replaces**
+   the flash, so simple multi-write paging does not work.
+   
+   **Path to full 8-message support:** capture the vendor Windows software's USB traffic
+   (QEMU/VirtualBox + USBPcap) to observe the real command sequence for > 256 bytes.
+   Until then the app enforces the 23-column cap.
+
+2. **Write timing is marginal:** a transient "all lit" result was observed on one run
+   that later rendered correctly with identical bytes. Delays after the handshake/header
+   (0.5 s) and between data lines (0.1 s) are used; reliability under load should be
+   validated before release.
 3. **Laser effect / brightness:** not supported (see §3.3).
 
 ## 10. Roadmap
 
-1. **MVP**: render text + images, single and multiple messages, effects/speed/blink/frame,
-   live preview, write + clear, on Linux and Windows.
-2. Resolve the 4-slot quirk and validate 8-message writes.
-3. Packaging with `jpackage` + CI for Windows/Linux installers.
+1. **MVP** (current scope): render text + images, up to 3 full-width (44 px) messages
+   (or more shorter ones, total ≤ 23 byte-columns), effects/speed/blink/frame,
+   live preview, write + clear, with a width-cap warning, on Linux and Windows.
+2. **Full 8-message support**: capture vendor Windows USB traffic to reverse-engineer the
+   > 256-byte protocol, then lift the cap.
+3. **Packaging** with `jpackage` + CI for Windows/Linux installers.
 4. Optional: animations, brightness (if a device variant supports it), macOS.
