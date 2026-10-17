@@ -167,7 +167,13 @@ Four layers, each independently testable:
    - `Badge` (a fixed array of 8 `BadgeMessage` plus the assembled payload).
 
 3. **Renderer layer**
-   - Converts text (via Java 2D `BufferedImage`/`Graphics2D` with system fonts at 11 px) and images (via `ImageIO`) into the column-major, MSB-first bitmaps described in §3.4.
+   - Converts text and images into the column-major, MSB-first bitmaps described in §3.4.
+   - **Text**: Java 2D `BufferedImage`/`Graphics2D` with **anti-aliasing off** (crisp 1-bit),
+     using the bundled **DejaVu Sans** font (Bitstream Vera License) at 11 px height. Text may
+     be wider than 44 px — it will scroll (scroll effects) or be clipped (freeze) — see §6.
+   - **Images**: `ImageIO`, scaled to 11 px height (aspect preserved), grayscale, thresholded
+     (≥ 128 = lit).
+   - Shared encoder: column-major, MSB = leftmost pixel, width rounded up to byte-columns.
 
 4. **UI layer** (JavaFX)
    - Message list + editor + controls + live preview + write/clear actions.
@@ -178,13 +184,16 @@ Four layers, each independently testable:
 - **Editor** (center/right): text field and/or image loader for the selected message.
 - **Controls**: effect dropdown, speed slider/spinner (1–8), blink and frame checkboxes.
 - **Preview**: an 11×44 grid rendered at an enlarged scale (e.g. 8–12×) that mirrors the exact bitmap; updates live.
+- **Overflow communication**: when a message is wider than 44 px, the preview draws the
+  44-px display "window" over the full bitmap and labels the result — "scrolling" (scroll
+  effects 0–3) or "clipped" (freeze/animation) — so the motion/truncation is not unexpected.
 - **Actions**: "Write to badge" and "Clear badge" buttons with progress/error feedback.
 
 ## 7. Cross-platform & Packaging
 
 - **Language/stack**: Java 25 (LTS), JavaFX 25, Maven, hid4java.
 - **HID**: hid4java bundles hidapi native libraries for Windows/Linux/macOS, so no system libs are needed at build or runtime.
-- **Text rendering**: Java 2D with system fonts (no freetype/fontconfig dev packages).
+- **Text rendering**: Java 2D with the **bundled DejaVu Sans** font (Bitstream Vera License) — no freetype/fontconfig dev packages, and consistent glyphs on every platform.
 - **Packaging**: `jpackage` produces a bundled JRE:
   - Windows: `.msi` / `.exe`
   - Linux: `.deb` / `.rpm` / AppImage
