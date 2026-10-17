@@ -36,62 +36,88 @@ public class BadgeWriter {
     }
 
     public boolean open() {
-        device = services.getHidDevice(VID, PID, null);
-        if (device == null) {
+        if (device != null) {
+            return true; // already open
+        }
+        HidDevice d = services.getHidDevice(VID, PID, null);
+        if (d == null) {
             return false;
         }
-        return device.open();
+        if (!d.open()) {
+            return false;
+        }
+        device = d;
+        return true;
     }
 
+    public boolean isOpen() {
+        return device != null;
+    }
+
+    /** Close the device handle (keeps the HID services running so it can be reopened). */
     public void close() {
         if (device != null) {
             device.close();
+            device = null;
         }
+    }
+
+    /** Close the device and shut down the HID services. */
+    public void shutdown() {
+        close();
         services.shutdown();
     }
 
     /**
-     * Sum of the byte-column widths of the given messages.
+     * Write the given messages (contiguous, from slot 0). Convenience for
+     * {@link #write(Badge)}.
      */
-    public static int totalColumns(BadgeMessage... messages) {
-        int total = 0;
-        for (BadgeMessage m : messages) {
-            total += m.cols();
+    public void writeMessages(BadgeMessage... messages) {
+        Badge badge = new Badge();
+        for (int i = 0; i < messages.length; i++) {
+            badge.set(i, messages[i]);
         }
-        return total;
+        write(badge);
     }
 
     /**
-     * Write one or more messages to the device (up to 8 slots). The total width across
-     * all messages must not exceed {@link #MAX_TOTAL_COLUMNS} byte-columns.
+     * Write a badge configuration to the device. Empty slots are allowed. The total
+     * width across all messages must not exceed {@link #MAX_TOTAL_COLUMNS} byte-columns.
      */
-    public void writeMessages(BadgeMessage... messages) {
-        if (messages.length > SLOTS) {
-            throw new IllegalArgumentException("at most " + SLOTS + " messages");
+    public void write(Badge badge) {
+        if (!isOpen()) {
+            throw new IllegalStateException("device is not open; call open() first");
         }
-        int total = totalColumns(messages);
+        int total = badge.totalColumns();
         if (total > MAX_TOTAL_COLUMNS) {
             throw new IllegalArgumentException(
                     "total content of " + total + " byte-columns exceeds the device limit of "
                             + MAX_TOTAL_COLUMNS + " (" + (MAX_TOTAL_COLUMNS * 8) + " px)");
         }
 
+        BadgeMessage[] slots = badge.slots();
+
         writeReport(handshakeReport());
         sleep(500);
-        writeReport(headerReport(messages));
+        writeReport(headerReport(slots));
         sleep(500);
 
-        int[] offsets = new int[messages.length];
+        int[] offsets = new int[SLOTS];
         int running = 0;
-        for (int i = 0; i < messages.length; i++) {
+        for (int i = 0; i < SLOTS; i++) {
             offsets[i] = running;
-            running += messages[i].cols();
+            if (slots[i] != null) {
+                running += slots[i].cols();
+            }
         }
 
         for (int row = 0; row < HEIGHT; row++) {
             byte[] line = new byte[REPORT_SIZE];
-            for (int i = 0; i < messages.length; i++) {
-                BadgeMessage m = messages[i];
+            for (int i = 0; i < SLOTS; i++) {
+                BadgeMessage m = slots[i];
+                if (m == null) {
+                    continue;
+                }
                 for (int col = 0; col < m.cols(); col++) {
                     line[offsets[i] + col] = m.bitmap()[col * HEIGHT + row];
                 }

@@ -18,7 +18,7 @@
         <javafx.version>25.0.4</javafx.version>
         <hid4java.version>0.8.0</hid4java.version>
         <junit.version>5.12.2</junit.version>
-        <mainClass>com.franklouw.b1248.Main</mainClass>
+        <mainClass>com.franklouw.b1248.ui.BadgeApp</mainClass>
     </properties>
 
     <dependencies>

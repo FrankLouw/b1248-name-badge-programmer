@@ -22,7 +22,7 @@ public class Main {
 
         System.out.println("Device opened; writing 3 full-width messages...");
         writer.writeMessages(border, leftHalf, rightHalf);
-        writer.close();
+        writer.shutdown();
         System.out.println("Done. Cycle through M1-M3 on the badge.");
     }
 
